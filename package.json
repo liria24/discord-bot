@@ -1,0 +1,26 @@
+{
+    "name": "liria-discord-bot",
+    "version": "1.0.0",
+    "type": "module",
+    "scripts": {
+        "build": "nitro build",
+        "dev": "nitro dev",
+        "preview": "nitro preview",
+        "start": "node ./.output/server/index.mjs",
+        "test": "bun test"
+    },
+    "dependencies": {
+        "discord.js": "^14.22.1",
+        "nitropack": "2.12.6"
+    },
+    "devDependencies": {
+        "@types/bun": "^1.2.23",
+        "@types/node": "^24.5.2",
+        "consola": "^3.4.2",
+        "prettier-plugin-organize-imports": "^4.3.0",
+        "typescript": "5.9.2"
+    },
+    "engines": {
+        "node": ">=20.0.0"
+    }
+}
