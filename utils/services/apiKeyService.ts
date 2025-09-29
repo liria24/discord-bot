@@ -1,0 +1,105 @@
+import { and, eq, isNull } from 'drizzle-orm'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { getDb } from '../db'
+import { apiKeys } from '../db/schema'
+
+const KEY_PREFIX = 'liria_sk'
+const KEY_SEPARATOR = '.'
+
+interface ParsedApiKey {
+    id: string
+    secret: string
+}
+
+const hashSecret = (secret: string) =>
+    createHash('sha256').update(secret).digest('hex')
+
+const parseApiKey = (rawKey: string): ParsedApiKey | null => {
+    if (!rawKey || typeof rawKey !== 'string') return null
+
+    const prefixMatch = `${KEY_PREFIX}_`
+
+    if (!rawKey.startsWith(prefixMatch)) return null
+
+    const payload = rawKey.slice(prefixMatch.length)
+    const [id, secret] = payload.split(KEY_SEPARATOR)
+
+    if (!id || !secret) return null
+
+    return { id, secret }
+}
+
+export const generateApiKeySecret = () => {
+    const id = randomUUID()
+    const secret = randomBytes(32).toString('base64url')
+    const rawKey = `${KEY_PREFIX}_${id}${KEY_SEPARATOR}${secret}`
+    const keyHash = hashSecret(secret)
+
+    return {
+        id,
+        secret,
+        rawKey,
+        keyHash,
+        lastFour: secret.slice(-4),
+    }
+}
+
+export const createApiKey = async (userId: string, name: string) => {
+    const db = getDb()
+    const now = new Date()
+    const { id, rawKey, keyHash, lastFour } = generateApiKeySecret()
+
+    await db.insert(apiKeys).values({
+        id,
+        userId,
+        name,
+        keyHash,
+        lastFour,
+        createdAt: now,
+    })
+
+    return { id, rawKey, lastFour }
+}
+
+export const verifyApiKey = async (rawKey: string) => {
+    const db = getDb()
+    const parsed = parseApiKey(rawKey)
+    if (!parsed) return null
+
+    const keyRecord = await db.query.apiKeys.findFirst({
+        where: and(eq(apiKeys.id, parsed.id), isNull(apiKeys.revokedAt)),
+        with: {
+            user: true,
+        },
+    })
+
+    if (!keyRecord) return null
+
+    if (keyRecord.keyHash !== hashSecret(parsed.secret)) return null
+
+    return keyRecord
+}
+
+export const markApiKeyUsed = async (id: string) => {
+    const db = getDb()
+    await db
+        .update(apiKeys)
+        .set({ lastUsedAt: new Date() })
+        .where(eq(apiKeys.id, id))
+}
+
+export const revokeApiKey = async (id: string) => {
+    const db = getDb()
+    await db
+        .update(apiKeys)
+        .set({ revokedAt: new Date() })
+        .where(eq(apiKeys.id, id))
+}
+
+export const listApiKeysForUser = async (userId: string) => {
+    const db = getDb()
+    return db.query.apiKeys.findMany({
+        where: and(eq(apiKeys.userId, userId), isNull(apiKeys.revokedAt)),
+        orderBy: (keys, { desc }) => desc(keys.createdAt),
+    })
+}

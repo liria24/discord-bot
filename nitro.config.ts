@@ -14,9 +14,17 @@ export default defineNitroConfig({
     },
 
     runtimeConfig: {
-        discordToken: process.env.DISCORD_TOKEN,
-        discordClientId: process.env.DISCORD_CLIENT_ID,
-        discordGuildId: process.env.DISCORD_GUILD_ID,
+        database: {
+            url: process.env.DATABASE_URL,
+        },
+        discord: {
+            token: process.env.DISCORD_TOKEN,
+            clientId: process.env.DISCORD_CLIENT_ID,
+            guildId: process.env.DISCORD_GUILD_ID,
+        },
+        liria: {
+            discordChannelId: process.env.DISCORD_CHANNEL_ID,
+        },
         public: {
             appName: 'Discord Bot',
         },
@@ -38,6 +46,15 @@ export default defineNitroConfig({
                 name: 'createConsola',
                 from: 'consola',
             },
+            {
+                name: 'z',
+                from: 'zod',
+            },
         ],
+    },
+
+    experimental: {
+        asyncContext: true,
+        openAPI: true,
     },
 })

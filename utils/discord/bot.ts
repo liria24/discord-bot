@@ -121,9 +121,15 @@ export const startDiscordBot = async (
     const interactionHandler = createInteractionHandler(commandMap)
 
     client.on(Events.InteractionCreate, async (interaction) => {
-        if (!interaction.isChatInputCommand()) return
+        if (interaction.isChatInputCommand()) {
+            await interactionHandler(interaction)
+            return
+        }
 
-        await interactionHandler(interaction)
+        if (interaction.isButton()) {
+            const handled = await handlePermissionRequestButton(interaction)
+            if (handled) return
+        }
     })
 
     try {
