@@ -1,8 +1,6 @@
 import { and, eq, isNull } from 'drizzle-orm'
-import { createHash } from 'node:crypto'
 import { nanoid } from 'nanoid'
-import { getDb } from '../db'
-import { apiKeys } from '../db/schema'
+import { createHash } from 'node:crypto'
 
 const KEY_PREFIX = 'liria_sk'
 const KEY_SEPARATOR = '.'
@@ -46,10 +44,10 @@ export const generateApiKeySecret = () => {
 }
 
 export const createApiKey = async (userId: string, name?: string) => {
-    const db = getDb()
+    const db = await getDb()
     const now = new Date()
     const { id, rawKey, keyHash, lastFour } = generateApiKeySecret()
-    
+
     // Generate default name with nanoid if not provided
     const finalName = name || nanoid(10)
 
@@ -66,7 +64,7 @@ export const createApiKey = async (userId: string, name?: string) => {
 }
 
 export const verifyApiKey = async (rawKey: string) => {
-    const db = getDb()
+    const db = await getDb()
     const parsed = parseApiKey(rawKey)
     if (!parsed) return null
 
@@ -85,7 +83,7 @@ export const verifyApiKey = async (rawKey: string) => {
 }
 
 export const markApiKeyUsed = async (id: string) => {
-    const db = getDb()
+    const db = await getDb()
     await db
         .update(apiKeys)
         .set({ lastUsedAt: new Date() })
@@ -93,7 +91,7 @@ export const markApiKeyUsed = async (id: string) => {
 }
 
 export const revokeApiKey = async (id: string) => {
-    const db = getDb()
+    const db = await getDb()
     await db
         .update(apiKeys)
         .set({ revokedAt: new Date() })
@@ -101,7 +99,7 @@ export const revokeApiKey = async (id: string) => {
 }
 
 export const listApiKeysForUser = async (userId: string) => {
-    const db = getDb()
+    const db = await getDb()
     return db.query.apiKeys.findMany({
         where: and(eq(apiKeys.userId, userId), isNull(apiKeys.revokedAt)),
         orderBy: (keys, { desc }) => desc(keys.createdAt),

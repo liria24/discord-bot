@@ -1,10 +1,8 @@
 import { and, eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
-import { getDb } from '../db'
-import { permissionRequests, type PermissionRequestStatus } from '../db/schema'
 
 export const getPermissionRequestById = async (id: string) => {
-    const db = getDb()
+    const db = await getDb()
 
     return db.query.permissionRequests.findFirst({
         where: eq(permissionRequests.id, id),
@@ -16,7 +14,7 @@ export const getPermissionRequestById = async (id: string) => {
 }
 
 export const createPermissionRequest = async (requesterId: string) => {
-    const db = getDb()
+    const db = await getDb()
     const now = new Date()
 
     const [request] = await db
@@ -34,7 +32,7 @@ export const createPermissionRequest = async (requesterId: string) => {
 }
 
 export const findPendingRequestByRequester = async (requesterId: string) => {
-    const db = getDb()
+    const db = await getDb()
 
     return db.query.permissionRequests.findFirst({
         where: and(
@@ -49,7 +47,7 @@ export const updatePermissionRequestStatus = async (
     status: PermissionRequestStatus,
     resolverId?: string
 ) => {
-    const db = getDb()
+    const db = await getDb()
     const now = new Date()
 
     const [updated] = await db
@@ -67,7 +65,7 @@ export const updatePermissionRequestStatus = async (
 }
 
 export const saveAdminMessageId = async (id: string, messageId: string) => {
-    const db = getDb()
+    const db = await getDb()
     const [updated] = await db
         .update(permissionRequests)
         .set({ adminMessageId: messageId, updatedAt: new Date() })

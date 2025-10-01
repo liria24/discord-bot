@@ -3,9 +3,6 @@ import {
     EmbedBuilder,
     SlashCommandBuilder,
 } from 'discord.js'
-import { createApiKey } from '../../services/apiKeyService'
-import { ensureUser, getUserPermissionLevel } from '../../services/userService'
-import type { DiscordCommand } from '../../types'
 
 const isPermitted = (permission: string | null | undefined) =>
     permission === 'granted' || permission === 'admin'

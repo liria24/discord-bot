@@ -1,10 +1,7 @@
 import { eq } from 'drizzle-orm'
-import { getDb } from '../db'
-import type { PermissionLevel } from '../db/schema'
-import { users } from '../db/schema'
 
 export const ensureUser = async (id: string, username?: string | null) => {
-    const db = getDb()
+    const db = await getDb()
     const now = new Date()
 
     const inserted = await db
@@ -23,7 +20,7 @@ export const ensureUser = async (id: string, username?: string | null) => {
 }
 
 export const getUserById = async (id: string) => {
-    const db = getDb()
+    const db = await getDb()
     return db.query.users.findFirst({ where: eq(users.id, id) })
 }
 
@@ -38,7 +35,7 @@ export const setUserPermission = async (
     id: string,
     permission: PermissionLevel | null
 ) => {
-    const db = getDb()
+    const db = await getDb()
     const now = new Date()
 
     const [updated] = await db
@@ -51,7 +48,7 @@ export const setUserPermission = async (
 }
 
 export const listUsersByPermission = async (permission: PermissionLevel) => {
-    const db = getDb()
+    const db = await getDb()
 
     return db.query.users.findMany({
         where: eq(users.permissionLevel, permission),
