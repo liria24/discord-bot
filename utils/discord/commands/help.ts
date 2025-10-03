@@ -31,14 +31,18 @@ export const helpCommand = {
                     value:
                         'APIキーを管理します。\n' +
                         '**権限必要: `granted` または `admin`**\n\n' +
-                        '・`/api-key create` - 新しいAPIキーを発行\n' +
+                        '・`/api-key create [name]` - 新しいAPIキーを発行\n' +
                         '・`/api-key list` - 所有するAPIキーをリスト表示\n' +
-                        '・`/api-key delete` - APIキーを削除',
+                        '・`/api-key delete <name>` - 指定した名前のAPIキーを削除',
                     inline: false,
                 },
                 {
-                    name: '📝 `/request-access`',
-                    value: 'APIキー発行権限を管理者に申請します。\n**権限不要** - 誰でも使用可能',
+                    name: '⚙️ `/preference`',
+                    value:
+                        '個人設定を管理します。\n' +
+                        '**権限不要** - 誰でも使用可能\n\n' +
+                        '・権限リクエストの送信\n' +
+                        '・Admin通知DM設定 (admin権限のみ)',
                     inline: false,
                 },
                 {

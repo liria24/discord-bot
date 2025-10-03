@@ -3,10 +3,8 @@ export default defineNitroConfig({
 
     preset: 'node-server',
 
-    plugins: [],
-
     // 開発モードの設定
-    dev: process.env.NODE_ENV !== 'production',
+    dev: import.meta.env.NODE_ENV !== 'production',
 
     // TypeScript設定
     typescript: {
@@ -15,29 +13,17 @@ export default defineNitroConfig({
 
     runtimeConfig: {
         database: {
-            url: process.env.DATABASE_URL,
+            url: import.meta.env.DATABASE_URL || '',
         },
         discord: {
-            token: process.env.DISCORD_TOKEN,
-            clientId: process.env.DISCORD_CLIENT_ID,
-            guildId: process.env.DISCORD_GUILD_ID,
-        },
-        liria: {
-            discordChannelId: process.env.DISCORD_CHANNEL_ID,
+            token: import.meta.env.DISCORD_TOKEN || '',
+            clientId: import.meta.env.DISCORD_CLIENT_ID || '',
+            guildId: import.meta.env.DISCORD_GUILD_ID || '',
+            installLink: import.meta.env.DISCORD_INSTALL_LINK || '',
         },
         public: {
             appName: 'Discord Bot',
         },
-    },
-
-    // ソースディレクトリ
-    srcDir: '.',
-
-    // 出力設定
-    output: {
-        dir: '.output',
-        publicDir: '.output/public',
-        serverDir: '.output/server',
     },
 
     imports: {

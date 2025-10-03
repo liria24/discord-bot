@@ -141,8 +141,12 @@ export const startDiscordBot = async (
         }
 
         if (interaction.isButton()) {
-            const handled = await handlePermissionRequestButton(interaction)
-            if (handled) return
+            // 順番にハンドラーをチェック
+            const handledByPermission = await handlePermissionRequestButton(interaction)
+            if (handledByPermission) return
+
+            const handledByPreference = await handlePreferenceButton(interaction)
+            if (handledByPreference) return
         }
     })
 

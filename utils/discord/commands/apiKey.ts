@@ -27,7 +27,7 @@ export const apiKeyCommand = {
                 .setName('delete')
                 .setDescription('APIキーを削除します')
                 .addStringOption((option) =>
-                    option.setName('id').setDescription('削除するAPIキーのID').setRequired(true)
+                    option.setName('name').setDescription('削除するAPIキーの名前').setRequired(true)
                 )
         ) as SlashCommandBuilder,
     async execute(interaction: ChatInputCommandInteraction) {
@@ -112,7 +112,7 @@ async function handleListApiKeys(interaction: ChatInputCommandInteraction) {
 
             embed.addFields({
                 name: `${key.name} (末尾: ****${key.lastFour})`,
-                value: `ID: \`${key.id}\`\n作成日: ${createdDate}\n最終使用: ${lastUsed}`,
+                value: `作成日: ${createdDate}\n最終使用: ${lastUsed}`,
                 inline: false,
             })
         }
@@ -125,21 +125,21 @@ async function handleListApiKeys(interaction: ChatInputCommandInteraction) {
 }
 
 async function handleDeleteApiKey(interaction: ChatInputCommandInteraction) {
-    const keyId = interaction.options.getString('id', true)
+    const keyName = interaction.options.getString('name', true)
 
     try {
         // ユーザーが所有するAPIキーか確認
         const apiKeys = await listApiKeysForUser(interaction.user.id)
-        const keyToDelete = apiKeys.find((key) => key.id === keyId)
+        const keyToDelete = apiKeys.find((key) => key.name === keyName)
 
         if (!keyToDelete) {
             await interaction.editReply(
-                'そのIDのAPIキーは見つかりませんでした。`/api-key list`で確認してください。'
+                'その名前のAPIキーは見つかりませんでした。`/api-key list`で確認してください。'
             )
             return
         }
 
-        await revokeApiKey(keyId)
+        await revokeApiKey(keyToDelete.id)
 
         await interaction.editReply(
             `✅ APIキー「${keyToDelete.name}」(****${keyToDelete.lastFour})を削除しました。`

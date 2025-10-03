@@ -16,11 +16,11 @@ describe('discordCommands', () => {
         expect(command?.data.description).toContain('APIキー')
     })
 
-    test('includes request-access command', () => {
-        const command = discordCommands.find((item) => item.data.name === 'request-access')
+    test('includes preference command', () => {
+        const command = discordCommands.find((item) => item.data.name === 'preference')
 
         expect(command).toBeDefined()
-        expect(command?.data.description).toContain('権限')
+        expect(command?.data.description).toContain('設定')
     })
 
     test('includes status command', () => {

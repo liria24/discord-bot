@@ -57,15 +57,6 @@ const adminMessageBodySchema = z
     )
 
 export default defineEventHandler(async (event) => {
-    const config = useRuntimeConfig(event)
-
-    if (!config.liria.discordChannelId)
-        throw createError({
-            statusCode: 500,
-            statusMessage: 'Internal Server Error',
-            message: 'Discord channel ID is not configured',
-        })
-
     const headers = getRequestHeaders(event)
     const authHeader = headers.authorization?.trim()
 
@@ -131,19 +122,58 @@ export default defineEventHandler(async (event) => {
     const client = controller.client
 
     try {
-        const channel = await client.channels.fetch(config.liria.discordChannelId)
+        // admin権限を持つユーザーを取得し、DM受信をオプトアウトしていないユーザーのみフィルタリング
+        const allAdminUsers = await listUsersByPermission('admin')
+        const adminUsers = allAdminUsers.filter((user) => !user.adminDmOptOut)
 
-        if (!channel || !channel.isSendable()) {
-            console.warn('Configured channel is not sendable:', config.liria.discordChannelId)
-            return { status: 'skipped' }
+        if (!adminUsers || adminUsers.length === 0) {
+            console.warn('No admin users found to send DM (or all opted out)')
+            return {
+                status: 'skipped',
+                reason: 'No admin users available (all may have opted out)',
+            }
         }
 
         const messageOptions: MessageCreateOptions = {}
         if (trimmedContent) messageOptions.content = trimmedContent
         if (embeds) messageOptions.embeds = embeds as APIEmbed[]
 
-        await channel.send(messageOptions)
+        const results = {
+            sent: 0,
+            failed: 0,
+            errors: [] as string[],
+        }
+
+        // 各adminユーザーにDMを送信
+        for (const admin of adminUsers) {
+            try {
+                const user = await client.users.fetch(admin.id)
+                await user.send(messageOptions)
+                results.sent++
+            } catch (error) {
+                console.error(`Failed to send DM to admin user ${admin.id}:`, error)
+                results.failed++
+                results.errors.push(`User ${admin.username || admin.id}: ${error}`)
+            }
+        }
+
         await markApiKeyUsed(apiKeyRecord.id)
+
+        if (results.sent === 0) {
+            throw createError({
+                statusCode: 502,
+                statusMessage: 'Bad Gateway',
+                message: 'Failed to deliver message to any admin users',
+                data: results,
+            })
+        }
+
+        return {
+            status: 'ok',
+            sent: results.sent,
+            failed: results.failed,
+            ...(results.failed > 0 && { errors: results.errors }),
+        }
     } catch (error) {
         console.error('Failed to deliver admin message to Discord', error)
         throw createError({
@@ -153,6 +183,4 @@ export default defineEventHandler(async (event) => {
             cause: error,
         })
     }
-
-    return { status: 'ok' }
 })

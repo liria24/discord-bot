@@ -1,5 +1,14 @@
 import { relations } from 'drizzle-orm'
-import { foreignKey, index, integer, pgEnum, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
+import {
+    boolean,
+    foreignKey,
+    index,
+    integer,
+    pgEnum,
+    pgTable,
+    text,
+    timestamp,
+} from 'drizzle-orm/pg-core'
 
 export const permissionEnum = pgEnum('permission_level', ['granted', 'admin'])
 export const permissionRequestStatusEnum = pgEnum('permission_request_status', [
@@ -14,6 +23,7 @@ export const users = pgTable(
         id: text('id').primaryKey(),
         username: text('username'),
         permissionLevel: permissionEnum('permission_level'),
+        adminDmOptOut: boolean('admin_dm_opt_out').default(false).notNull(),
         createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
         updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
     },

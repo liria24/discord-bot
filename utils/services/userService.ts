@@ -49,3 +49,21 @@ export const listUsersByPermission = async (permission: PermissionLevel) => {
         where: eq(users.permissionLevel, permission),
     })
 }
+
+export const setAdminDmOptOut = async (id: string, optOut: boolean) => {
+    const db = await getDb()
+    const now = new Date()
+
+    const [updated] = await db
+        .update(users)
+        .set({ adminDmOptOut: optOut, updatedAt: now })
+        .where(eq(users.id, id))
+        .returning()
+
+    return updated ?? null
+}
+
+export const getAdminDmOptOut = async (id: string): Promise<boolean> => {
+    const record = await getUserById(id)
+    return record?.adminDmOptOut ?? false
+}
