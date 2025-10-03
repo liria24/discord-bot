@@ -122,13 +122,13 @@ const forwardEmailToAdmins = async (account: EmailAccount, email: ParsedMail) =>
 
     const embed = new EmbedBuilder()
         .setTitle(`📧 新着メール: ${account.name}`)
+        .setDescription(account.email)
         .setColor(0x3498db)
         .addFields(
-            { name: '受信アカウント', value: account.email, inline: false },
             { name: '差出人', value: email.from?.text ?? 'Unknown', inline: true },
-            { name: '件名', value: email.subject ?? '(件名なし)', inline: true },
-            { name: '日時', value: email.date?.toLocaleString('ja-JP') ?? 'Unknown', inline: true }
+            { name: '件名', value: email.subject ?? '(件名なし)', inline: true }
         )
+        .setFooter({ text: email.date?.toLocaleString('ja-JP') ?? 'Unknown Time' })
         .setTimestamp()
 
     // メール本文（プレーンテキスト）を追加

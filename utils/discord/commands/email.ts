@@ -37,7 +37,7 @@ export const emailCommand = {
                 )
         )
         .addSubcommand((subcommand) =>
-            subcommand.setName('check-now').setDescription('すぐに新着メールをチェックします')
+            subcommand.setName('check').setDescription('すぐに新着メールをチェックします')
         ) as SlashCommandBuilder,
     async execute(interaction: ChatInputCommandInteraction) {
         // addサブコマンドはモーダル表示のため、deferReplyしない
@@ -62,7 +62,7 @@ export const emailCommand = {
             await handleToggleEmail(interaction)
         } else if (subcommand === 'delete') {
             await handleDeleteEmail(interaction)
-        } else if (subcommand === 'check-now') {
+        } else if (subcommand === 'check') {
             await handleCheckNow(interaction)
         }
     },
@@ -129,15 +129,15 @@ async function handleAddEmail(interaction: ChatInputCommandInteraction) {
         .setCustomId('host')
         .setLabel('IMAPホスト')
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder('imap.example.com')
+        .setPlaceholder('imap.example.com または imap.example.com:993')
         .setRequired(true)
 
     const userInput = new TextInputBuilder()
         .setCustomId('user')
-        .setLabel('IMAPユーザー名')
+        .setLabel('IMAPユーザー名（省略可）')
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder('通常はメールアドレスと同じ')
-        .setRequired(true)
+        .setPlaceholder('未入力の場合はメールアドレスと同じ')
+        .setRequired(false)
 
     const passwordInput = new TextInputBuilder()
         .setCustomId('password')
