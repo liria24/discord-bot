@@ -69,8 +69,9 @@ export const helpCommand = {
                         'メールアカウントの監視を管理します。\n\n' +
                         '・`/email list` - 監視中のメールアカウントをリスト表示\n' +
                         '・`/email add` - 新しいメールアカウントを追加\n' +
-                        '・`/email toggle <name>` - メールアカウントの有効/無効を切り替え\n' +
-                        '・`/email delete <name>` - メールアカウントを削除',
+                        '・`/email toggle <email>` - メールアカウントの有効/無効を切り替え\n' +
+                        '・`/email delete <email>` - メールアカウントを削除\n' +
+                        '・`/email check-now` - すぐに新着メールをチェック',
                     inline: false,
                 }
             )

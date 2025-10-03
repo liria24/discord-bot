@@ -48,6 +48,13 @@ export const getEmailAccountById = async (id: string) => {
     })
 }
 
+export const getEmailAccountByAddress = async (email: string) => {
+    const db = await getDb()
+    return db.query.emailAccounts.findFirst({
+        where: eq(emailAccounts.email, email),
+    })
+}
+
 export const updateEmailAccountEnabled = async (id: string, enabled: boolean) => {
     const db = await getDb()
     const now = new Date()

@@ -25,7 +25,7 @@ export const emailCommand = {
                 .setName('toggle')
                 .setDescription('メールアカウントの有効/無効を切り替えます')
                 .addStringOption((option) =>
-                    option.setName('id').setDescription('メールアカウントのID').setRequired(true)
+                    option.setName('email').setDescription('メールアドレス').setRequired(true)
                 )
         )
         .addSubcommand((subcommand) =>
@@ -33,8 +33,11 @@ export const emailCommand = {
                 .setName('delete')
                 .setDescription('メールアカウントを削除します')
                 .addStringOption((option) =>
-                    option.setName('id').setDescription('メールアカウントのID').setRequired(true)
+                    option.setName('email').setDescription('メールアドレス').setRequired(true)
                 )
+        )
+        .addSubcommand((subcommand) =>
+            subcommand.setName('check-now').setDescription('すぐに新着メールをチェックします')
         ) as SlashCommandBuilder,
     async execute(interaction: ChatInputCommandInteraction) {
         // addサブコマンドはモーダル表示のため、deferReplyしない
@@ -59,6 +62,8 @@ export const emailCommand = {
             await handleToggleEmail(interaction)
         } else if (subcommand === 'delete') {
             await handleDeleteEmail(interaction)
+        } else if (subcommand === 'check-now') {
+            await handleCheckNow(interaction)
         }
     },
 } satisfies DiscordCommand
@@ -88,10 +93,7 @@ async function handleListEmails(interaction: ChatInputCommandInteraction) {
 
             embed.addFields({
                 name: `${account.name} ${status}`,
-                value:
-                    `ID: \`${account.id}\`\n` +
-                    `Email: ${account.email}\n` +
-                    `最終チェック: ${lastChecked}`,
+                value: `Email: ${account.email}\n` + `最終チェック: ${lastChecked}`,
                 inline: false,
             })
         }
@@ -155,20 +157,20 @@ async function handleAddEmail(interaction: ChatInputCommandInteraction) {
 }
 
 async function handleToggleEmail(interaction: ChatInputCommandInteraction) {
-    await interaction.deferReply({ ephemeral: true })
-
-    const id = interaction.options.getString('id', true)
+    const email = interaction.options.getString('email', true)
 
     try {
-        const account = await getEmailAccountById(id)
+        const account = await getEmailAccountByAddress(email)
 
         if (!account) {
-            await interaction.editReply('指定されたIDのメールアカウントが見つかりませんでした。')
+            await interaction.editReply(
+                '指定されたメールアドレスのアカウントが見つかりませんでした。'
+            )
             return
         }
 
         const newStatus = !account.enabled
-        await updateEmailAccountEnabled(id, newStatus)
+        await updateEmailAccountEnabled(account.id, newStatus)
 
         await interaction.editReply(
             `✅ メールアカウント「${account.name}」を${newStatus ? '有効' : '無効'}にしました。`
@@ -180,24 +182,65 @@ async function handleToggleEmail(interaction: ChatInputCommandInteraction) {
 }
 
 async function handleDeleteEmail(interaction: ChatInputCommandInteraction) {
-    await interaction.deferReply({ ephemeral: true })
-
-    const id = interaction.options.getString('id', true)
+    const email = interaction.options.getString('email', true)
 
     try {
-        const account = await getEmailAccountById(id)
+        const account = await getEmailAccountByAddress(email)
 
         if (!account) {
-            await interaction.editReply('指定されたIDのメールアカウントが見つかりませんでした。')
+            await interaction.editReply(
+                '指定されたメールアドレスのアカウントが見つかりませんでした。'
+            )
             return
         }
 
-        await deleteEmailAccount(id)
+        await deleteEmailAccount(account.id)
 
         await interaction.editReply(`✅ メールアカウント「${account.name}」を削除しました。`)
     } catch (error) {
         console.error('Failed to delete email account', error)
         await interaction.editReply('メールアカウントの削除に失敗しました。')
+    }
+}
+
+async function handleCheckNow(interaction: ChatInputCommandInteraction) {
+    await interaction.editReply('📧 メールチェックを開始しています...')
+
+    try {
+        const result = await checkEmailsNow()
+
+        if (result.total === 0) {
+            await interaction.editReply('❌ 有効なメールアカウントがありません。')
+            return
+        }
+
+        const embed = new EmbedBuilder()
+            .setTitle('✅ メールチェック完了')
+            .setColor(0x2ecc71)
+            .addFields(
+                {
+                    name: '対象アカウント',
+                    value: `${result.total}件`,
+                    inline: true,
+                },
+                {
+                    name: 'チェック成功',
+                    value: `${result.checked}件`,
+                    inline: true,
+                }
+            )
+            .setTimestamp()
+
+        if (result.checked < result.total) {
+            embed.setDescription(
+                `⚠️ ${result.total - result.checked}件のアカウントでエラーが発生しました。`
+            )
+        }
+
+        await interaction.editReply({ content: '', embeds: [embed] })
+    } catch (error) {
+        console.error('Failed to check emails now', error)
+        await interaction.editReply('❌ メールチェック中にエラーが発生しました。')
     }
 }
 

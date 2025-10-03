@@ -215,3 +215,22 @@ export const stopEmailMonitoring = () => {
         logger.info('Stopped email monitoring service')
     }
 }
+
+export const checkEmailsNow = async (): Promise<{ total: number; checked: number }> => {
+    const accounts = await listEnabledEmailAccounts()
+    let checked = 0
+
+    logger.info(`Manually checking ${accounts.length} email account(s)`)
+
+    for (const account of accounts) {
+        try {
+            await checkEmailAccount(account)
+            await updateEmailAccountLastChecked(account.id)
+            checked++
+        } catch (error) {
+            logger.error(`Failed to check email account ${account.email}:`, error)
+        }
+    }
+
+    return { total: accounts.length, checked }
+}
