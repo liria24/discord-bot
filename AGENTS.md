@@ -12,8 +12,8 @@ Most of these are provided by MCP servers via Context7.
 - Discord.js v14
 - Zod
 - Drizzle ORM
+- PGlite
 - Railway
-- PostgreSQL
 
 ## Setup commands
 
