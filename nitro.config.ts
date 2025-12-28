@@ -36,4 +36,8 @@ export default defineNitroConfig({
         openAPI: true,
         wasm: true,
     },
+
+    externals: {
+        inline: ['nanoid'],
+    },
 })
