@@ -1,8 +1,10 @@
-import { EmbedBuilder } from 'discord.js'
 import type { ImapMessage } from 'imap'
-import Imap from 'imap'
 import type { ParsedMail } from 'mailparser'
+
+import { EmbedBuilder } from 'discord.js'
+import Imap from 'imap'
 import { simpleParser } from 'mailparser'
+
 import { getDiscordBotController } from './discord/bot'
 import {
     getCheckInterval,

@@ -1,5 +1,6 @@
-import { randomUUID } from 'node:crypto'
 import { eq } from 'drizzle-orm'
+import { randomUUID } from 'node:crypto'
+
 import { getDb } from '../db'
 import { type PermissionRequestStatus, permissionRequests } from '../db/schema'
 

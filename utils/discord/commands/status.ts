@@ -5,8 +5,10 @@ import {
     MessageFlags,
     SlashCommandBuilder,
 } from 'discord.js'
-import { getBotStatusHistory, saveBotStatus } from '../../services/statusService'
+
 import type { DiscordCommand } from '../../types'
+
+import { getBotStatusHistory, saveBotStatus } from '../../services/statusService'
 import { showPermissionPromptIfNeeded } from '../permissionPrompt'
 
 const activityTypeChoices = [

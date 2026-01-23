@@ -4,6 +4,9 @@ import {
     MessageFlags,
     SlashCommandBuilder,
 } from 'discord.js'
+
+import type { DiscordCommand } from '../../types'
+
 import { checkEmailsNow } from '../../emailMonitor'
 import {
     createEmailAccount,
@@ -13,7 +16,6 @@ import {
     listEmailAccounts,
     updateEmailAccountEnabled,
 } from '../../services/emailService'
-import type { DiscordCommand } from '../../types'
 import { showPermissionPromptIfNeeded } from '../permissionPrompt'
 
 export const emailCommand = {

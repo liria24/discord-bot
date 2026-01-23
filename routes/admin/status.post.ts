@@ -2,6 +2,7 @@ import { ActivityType } from 'discord.js'
 import { defineHandler, HTTPError } from 'nitro/h3'
 import { useRuntimeConfig } from 'nitro/runtime-config'
 import { z } from 'zod'
+
 import { getDiscordBotController } from '../../utils/discord/bot'
 import { saveBotStatus } from '../../utils/services/statusService'
 import { validateBody } from '../../utils/validateRequest'

@@ -5,6 +5,7 @@ import {
     type ChatInputCommandInteraction,
     EmbedBuilder,
 } from 'discord.js'
+
 import { findPendingRequestByRequester } from '../services/permissionRequestService'
 import { ensureUser, getUserPermissionLevel } from '../services/userService'
 

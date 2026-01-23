@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
+
 import { getDb } from '../db'
 import { emailAccounts, emailCheckSettings } from '../db/schema'
 

@@ -1,10 +1,12 @@
+import type { z } from 'zod'
+
 import {
     getValidatedQuery,
     getValidatedRouterParams,
     type H3Event,
     readValidatedBody,
 } from 'nitro/deps/h3'
-import type { z } from 'zod'
+
 import sanitizeObject from './sanitizeObject'
 
 export const validateBody = async <T extends z.ZodTypeAny>(

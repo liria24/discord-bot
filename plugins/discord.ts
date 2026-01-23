@@ -1,6 +1,7 @@
 import { createConsola } from 'consola'
 import { definePlugin } from 'nitro'
 import { useRuntimeConfig } from 'nitro/runtime-config'
+
 import {
     clearDiscordBotController,
     getDiscordBotController,

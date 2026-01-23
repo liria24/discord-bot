@@ -1,10 +1,12 @@
-import { mkdir } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import type { LibSQLDatabase } from 'drizzle-orm/libsql'
+
 import { createClient } from '@libsql/client'
 import { createConsola } from 'consola'
-import type { LibSQLDatabase } from 'drizzle-orm/libsql'
 import { drizzle } from 'drizzle-orm/libsql'
 import { useRuntimeConfig } from 'nitro/runtime-config'
+import { mkdir } from 'node:fs/promises'
+import { dirname } from 'node:path'
+
 import { relations } from './relations'
 import * as schema from './schema'
 

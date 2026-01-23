@@ -2,6 +2,7 @@ import { nanoid } from 'nanoid'
 import { defineHandler, HTTPError } from 'nitro/h3'
 import { useRuntimeConfig } from 'nitro/runtime-config'
 import { z } from 'zod'
+
 import { getDb } from '../../utils/db'
 import { users } from '../../utils/db/schema'
 import { validateBody } from '../../utils/validateRequest'
