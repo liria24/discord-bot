@@ -34,10 +34,5 @@ export default defineNitroConfig({
     experimental: {
         asyncContext: true,
         openAPI: true,
-        wasm: true,
-    },
-
-    externals: {
-        inline: ['nanoid'],
     },
 })

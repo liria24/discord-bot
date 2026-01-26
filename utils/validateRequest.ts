@@ -5,7 +5,7 @@ import {
     getValidatedRouterParams,
     type H3Event,
     readValidatedBody,
-} from 'nitro/deps/h3'
+} from 'nitro/h3'
 
 import sanitizeObject from './sanitizeObject'
 
