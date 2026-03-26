@@ -10,7 +10,7 @@
     "build": "nitro build",
     "dev": "nitro dev",
     "preview": "nitro preview",
-    "prestart": "drizzle-kit push",
+    "prestart": "drizzle-kit push --force",
     "start": "node ./.output/server/index.mjs",
     "test": "bun test",
     "check": "vp check",
