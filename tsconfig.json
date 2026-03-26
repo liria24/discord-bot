@@ -1,4 +1,7 @@
 {
-    "extends": "nitro/tsconfig"
-    // "include": [".nitro/types/nitro-imports.d.ts", "src"]
+    "extends": "nitro/tsconfig",
+    "include": [
+        "node_modules/.nitro/types/nitro-imports.d.ts",
+        "server"
+    ]
 }

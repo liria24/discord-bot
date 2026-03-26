@@ -3,7 +3,9 @@ import { defineNitroConfig } from 'nitro/config'
 export default defineNitroConfig({
     compatibilityDate: 'latest',
 
-    serverDir: './',
+    serverDir: './server',
+
+    buildDir: './.nitro',
 
     preset: 'node-server',
 
@@ -21,7 +23,6 @@ export default defineNitroConfig({
         email: {
             monitor: import.meta.env.EMAIL_MONITOR === 'true',
         },
-        memoryMonitor: import.meta.env.MEMORY_MONITOR === 'true',
         public: {
             appName: 'Discord Bot',
         },
@@ -29,6 +30,13 @@ export default defineNitroConfig({
 
     routeRules: {
         '/': { redirect: import.meta.env.DISCORD_INSTALL_LINK },
+    },
+
+    imports: {},
+
+    typescript: {
+        strict: true,
+        generateTsConfig: true,
     },
 
     experimental: {
