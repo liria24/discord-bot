@@ -1,5 +1,5 @@
-import { createEmailMonitor } from '@liria/email-monitor'
-import type { EmailAccount, ParsedMail } from '@liria/email-monitor'
+import { createEmailWatcher } from '@liria/email-poller'
+import type { EmailAccount, EmailWatcher, ParsedEmail } from '@liria/email-poller'
 import { consola } from 'consola'
 import {
     ActivityType,
@@ -26,9 +26,9 @@ import {
     clearBotStatusStorage,
     getBotStatusStorage,
     setBotStatusStorage,
-} from './botStatusStorage.js'
-import type { DiscordBotController } from './client.js'
+} from './botStatus.js'
 import {
+    type DiscordBotController,
     clearDiscordBotController,
     getDiscordBotController,
     setDiscordBotController,
@@ -36,44 +36,67 @@ import {
 import { createEmailCommand } from './commands/email.js'
 import { createHelpCommand } from './commands/help.js'
 import { createStatusCommand } from './commands/status.js'
-import { clearEmailMonitor, getEmailMonitor, setEmailMonitor } from './emailMonitor.js'
-import type { DiscordCommand, PermissionChecker } from './types.js'
-
-type EmailMonitor = ReturnType<typeof createEmailMonitor>
+import {
+    EmailMonitorStorage,
+    clearEmailMonitor,
+    clearEmailMonitorStorage,
+    getEmailMonitor,
+    setEmailMonitor,
+    setEmailMonitorStorage,
+} from './emailMonitor.js'
+import type { CommandGuard, DiscordCommand } from './types.js'
 
 declare module 'nitro/types' {
     interface NitroApp {
-        emailMonitor?: EmailMonitor
+        emailMonitor?: EmailWatcher
     }
 }
 
 export interface EmailMonitorConfig {
-    enabled: boolean
-    /** Nitro storage mount name. Defaults to `discord:emailMonitor`. */
-    storageName?: string
+    /** Start the email watcher on boot. Defaults to `false`. */
+    enabled?: boolean
+    /** Register the `/email` slash command. Defaults to the value of `enabled`. */
+    enableCommands?: boolean
+    /** Nitro storage mount name. When specified, account settings are persisted. */
+    storageMount?: string
     onNewEmail: (params: {
         embed: EmbedBuilder
         account: EmailAccount
-        email: ParsedMail
+        email: ParsedEmail
     }) => Promise<void>
+    /**
+     * Custom watcher factory for non-IMAP protocols.
+     * When omitted, the default Email watcher (via `@liria/email-poller`) is used.
+     */
+    createWatcher?: (
+        storage: EmailMonitorStorage,
+        onEmail: (account: EmailAccount, email: ParsedEmail) => Promise<void>
+    ) => EmailWatcher
 }
 
 export interface BotStatusConfig {
-    /** Nitro storage mount name. Defaults to `discord:botStatus`. */
-    storageName?: string
+    /** Enable bot-status features (status restore, /admin/status route). Defaults to `false`. */
+    enabled?: boolean
+    /** Register the `/status` slash command. Defaults to the value of `enabled`. */
+    enableCommands?: boolean
+    /**
+     * Nitro storage mount name. When specified, status changes are persisted
+     * and restored on restart. When omitted, status is applied in-memory only.
+     */
+    storageMount?: string
     /**
      * Wrap the internal route handler with authentication/authorization.
      * e.g. `(inner) => adminHandler(({ event }) => inner(event))`
      * When omitted the POST /admin/status route is not registered.
      */
-    routeWrapper?: (inner: (event: H3Event) => Promise<unknown>) => EventHandler
+    routeAuth?: (inner: (event: H3Event) => Promise<unknown>) => EventHandler
 }
 
 export interface DiscordPluginConfig {
-    name?: string /* Bot name. */
+    botName?: string
     emailMonitor?: EmailMonitorConfig
     botStatus?: BotStatusConfig
-    permissionChecker?: PermissionChecker
+    guard?: CommandGuard
     help?: { enabled?: boolean; footer?: string }
 }
 
@@ -152,7 +175,7 @@ async function registerCommands(
     log.success('Slash commands registered successfully')
 }
 
-const buildEmailEmbed = (account: EmailAccount, email: ParsedMail): EmbedBuilder => {
+const buildEmailEmbed = (account: EmailAccount, email: ParsedEmail): EmbedBuilder => {
     const embed = new EmbedBuilder()
         .setTitle(`📧 New Mail: ${account.name}`)
         .setDescription(account.email)
@@ -200,17 +223,17 @@ function parseStatusBody(body: unknown): { message: string; activityType: number
         })
     }
     const { message, activityType: activityTypeStr } = body as Record<string, unknown>
-    if (typeof message !== 'string' || message.length === 0) {
+    if (typeof message !== 'string' || message.trim().length === 0) {
         throw new HTTPError({
             status: StatusCodes.BAD_REQUEST,
             statusText: getReasonPhrase(StatusCodes.BAD_REQUEST),
             message: 'message is required',
         })
     }
-    const actTypeName = (activityTypeStr ?? 'Playing') as string as keyof typeof activityTypeMap
+    const actTypeName = String(activityTypeStr ?? 'Playing') as keyof typeof activityTypeMap
     const activityType =
         actTypeName in activityTypeMap ? activityTypeMap[actTypeName] : ActivityType.Playing
-    return { message, activityType }
+    return { message: message.trim(), activityType }
 }
 
 const handleStatusRoute = async (event: H3Event): Promise<unknown> => {
@@ -218,44 +241,47 @@ const handleStatusRoute = async (event: H3Event): Promise<unknown> => {
     const { message, activityType } = parseStatusBody(body)
 
     const storage = getBotStatusStorage()
-    if (!storage) {
-        throw new HTTPError({
-            status: StatusCodes.SERVICE_UNAVAILABLE,
-            statusText: getReasonPhrase(StatusCodes.SERVICE_UNAVAILABLE),
-            message: 'Status storage is not initialized',
-        })
-    }
-
-    const entry = await storage.save({ message, activityType })
+    const entry = storage ? await storage.save({ message, activityType }) : null
 
     const controller = getDiscordBotController()
     if (controller?.isReady()) {
         controller.client.user?.setActivity(message, { type: activityType })
     }
 
-    return entry
+    return entry ?? { message, activityType }
 }
 
 export const defineDiscordPlugin = (
     hooks: DiscordPluginHooks = {},
     config?: DiscordPluginConfig
 ) => {
-    let baseCommands = config?.emailMonitor
-        ? [...discordCommands, createEmailCommand(config.permissionChecker)]
-        : [...discordCommands]
-    if (config?.botStatus) {
-        baseCommands = [...baseCommands, createStatusCommand(config.permissionChecker)]
-    }
+    const guard = config?.guard
+    const emailCfg = config?.emailMonitor
+    const statusCfg = config?.botStatus
+
+    const emailMonitorEnabled = emailCfg?.enabled ?? false
+    const emailCommandsEnabled = emailMonitorEnabled && (emailCfg?.enableCommands ?? true)
+    const botStatusEnabled = statusCfg?.enabled ?? false
+    const statusCommandsEnabled = botStatusEnabled && (statusCfg?.enableCommands ?? true)
+    const botStatusHasStorage = botStatusEnabled && !!statusCfg?.storageMount
+
+    const baseCommands: DiscordCommand[] = [
+        ...discordCommands,
+        ...(emailCommandsEnabled ? [createEmailCommand(guard)] : []),
+        ...(statusCommandsEnabled ? [createStatusCommand(guard, botStatusHasStorage)] : []),
+    ]
+
     const allCommands =
-        config?.help?.enabled !== false
+        baseCommands.length > 0 && config?.help?.enabled !== false
             ? [
                   createHelpCommand(baseCommands, {
                       footer: config?.help?.footer,
-                      name: config?.name,
+                      name: config?.botName,
                   }),
                   ...baseCommands,
               ]
             : baseCommands
+
     return definePlugin(async (nitroApp) => {
         const token = process.env.DISCORD_TOKEN ?? ''
         const clientId = process.env.DISCORD_CLIENT_ID ?? ''
@@ -273,13 +299,9 @@ export const defineDiscordPlugin = (
             return
         }
 
-        // Initialize bot status storage early so it's available for the onReady handler
-        if (config?.botStatus) {
-            setBotStatusStorage(
-                new BotStatusStorage(
-                    useStorage(config.botStatus.storageName ?? 'discord:botStatus')
-                )
-            )
+        // Initialize bot status storage only when a mount is explicitly configured
+        if (botStatusHasStorage) {
+            setBotStatusStorage(new BotStatusStorage(useStorage(statusCfg!.storageMount!)))
         }
 
         try {
@@ -291,8 +313,8 @@ export const defineDiscordPlugin = (
             client.once(Events.ClientReady, async (readyClient) => {
                 log.success(`Bot logged in as ${readyClient.user.tag}`)
 
-                // Restore last bot status from storage
-                if (config?.botStatus) {
+                // Restore last bot status from storage (only when storage is configured)
+                if (botStatusHasStorage) {
                     try {
                         const latest = await getBotStatusStorage()?.getLatest()
                         if (latest) {
@@ -335,40 +357,58 @@ export const defineDiscordPlugin = (
             }
             setDiscordBotController(controller)
 
-            // Register the bot status HTTP route if routeWrapper is provided
-            if (config?.botStatus?.routeWrapper) {
+            // Register the bot status HTTP route if routeAuth is provided
+            if (statusCfg?.routeAuth) {
                 nitroApp.h3?.['~addRoute']({
                     route: '/admin/status',
                     method: 'POST',
-                    handler: config.botStatus.routeWrapper(handleStatusRoute),
+                    handler: statusCfg.routeAuth(handleStatusRoute),
                 })
             }
 
-            if (config?.emailMonitor) {
-                const monitor = createEmailMonitor(
-                    useStorage(config.emailMonitor.storageName ?? 'discord:emailMonitor'),
-                    {
-                        onNewEmail: async (account, email) => {
-                            const embed = buildEmailEmbed(account, email)
-                            await config.emailMonitor!.onNewEmail({ embed, account, email })
-                        },
-                    }
+            if (emailMonitorEnabled && emailCfg) {
+                const emailMonitorStorage = new EmailMonitorStorage(
+                    useStorage(emailCfg.storageMount ?? 'discord:emailMonitor')
                 )
+                setEmailMonitorStorage(emailMonitorStorage)
+
+                const onEmail = async (account: EmailAccount, email: ParsedEmail) => {
+                    const embed = buildEmailEmbed(account, email)
+                    await emailCfg.onNewEmail({ embed, account, email })
+                }
+
+                let monitor: EmailWatcher
+
+                if (emailCfg.createWatcher) {
+                    monitor = emailCfg.createWatcher(emailMonitorStorage, onEmail)
+                } else {
+                    // Default IMAP watcher — email-monitor handles credential extraction internally
+                    monitor = createEmailWatcher({
+                        deps: {
+                            getEnabledAccounts: () => emailMonitorStorage.listEnabledAccounts(),
+                            getCheckInterval: () => emailMonitorStorage.getCheckInterval(),
+                            updateLastChecked: (id) => emailMonitorStorage.updateLastChecked(id),
+                        },
+                        onEmail,
+                    })
+                }
+
                 setEmailMonitor(monitor)
                 nitroApp.emailMonitor = monitor
-                if (config.emailMonitor.enabled) await monitor.start()
+                await monitor.start()
             }
 
             await hooks.onStart?.()
 
             nitroApp.hooks.hook('close', async () => {
                 await hooks.onClose?.()
-                if (config?.emailMonitor) {
+                if (emailMonitorEnabled) {
                     getEmailMonitor()?.stop()
                     clearEmailMonitor()
+                    clearEmailMonitorStorage()
                     nitroApp.emailMonitor = undefined
                 }
-                if (config?.botStatus) {
+                if (botStatusHasStorage) {
                     clearBotStatusStorage()
                 }
                 await controller.shutdown()

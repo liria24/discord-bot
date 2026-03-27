@@ -7,11 +7,6 @@ export interface DiscordCommand {
 }
 
 /**
- * Type for the permission check function.
- * Returning `true` means "no permission (abort)", returning `false` means "permission granted (continue)".
- * If `undefined`, the permission check is skipped and everyone is allowed.
+ * Returns `true` when the user lacks permission (access should be denied).
  */
-export type PermissionChecker = (
-    interaction: ChatInputCommandInteraction,
-    permission: 'granted' | 'admin'
-) => Promise<boolean>
+export type CommandGuard = (interaction: ChatInputCommandInteraction) => Promise<boolean>

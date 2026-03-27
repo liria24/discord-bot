@@ -11,7 +11,6 @@ export default defineNitroConfig({
     preset: 'node-server',
 
     runtimeConfig: {
-        key: import.meta.env.KEY || '',
         sqlite: {
             dbPath: import.meta.env.SQLITE_DB_PATH || './data/sqlite.db',
         },
@@ -20,9 +19,6 @@ export default defineNitroConfig({
             clientId: import.meta.env.DISCORD_CLIENT_ID || '',
             guildId: import.meta.env.DISCORD_GUILD_ID || '',
             installLink: import.meta.env.DISCORD_INSTALL_LINK || '',
-        },
-        emailMonitor: {
-            enabled: import.meta.env.EMAIL_MONITOR === 'true',
         },
     },
 

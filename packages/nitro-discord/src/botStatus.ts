@@ -1,4 +1,7 @@
-import type { Storage } from 'unstorage'
+interface StorageAdapter {
+    getItem<T>(key: string): Promise<T | null>
+    setItem(key: string, value: unknown): Promise<void>
+}
 
 export interface BotStatusEntry {
     id: string
@@ -12,9 +15,9 @@ const MAX_HISTORY = 100
 const HISTORY_KEY = 'history'
 
 export class BotStatusStorage {
-    private storage: Storage
+    private storage: StorageAdapter
 
-    constructor(storage: Storage) {
+    constructor(storage: StorageAdapter) {
         this.storage = storage
     }
 

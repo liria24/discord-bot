@@ -7,8 +7,8 @@ import {
     SlashCommandBuilder,
 } from 'discord.js'
 
-import { getBotStatusStorage } from '../botStatusStorage.js'
-import type { DiscordCommand, PermissionChecker } from '../types.js'
+import { getBotStatusStorage } from '../botStatus.js'
+import type { CommandGuard, DiscordCommand } from '../types.js'
 
 const log = consola.withTag('status')
 
@@ -24,60 +24,67 @@ const activityTypeNames: Record<number, string> = Object.fromEntries(
     activityTypeChoices.map((c) => [c.value, c.name])
 )
 
-export const createStatusCommand = (checker?: PermissionChecker): DiscordCommand => ({
-    data: new SlashCommandBuilder()
+export const createStatusCommand = (guard?: CommandGuard, hasStorage = true): DiscordCommand => {
+    const builder = new SlashCommandBuilder()
         .setName('status')
-        .setDescription('Botのステータスを管理します (管理者のみ)')
+        .setDescription('Manage bot status (admin only)')
         .addSubcommand((subcommand) =>
             subcommand
                 .setName('set')
-                .setDescription('Botのステータスメッセージを変更します')
+                .setDescription('Change the bot status message')
                 .addStringOption((option) =>
                     option
                         .setName('message')
-                        .setDescription('ステータスメッセージ')
+                        .setDescription('Status message')
                         .setRequired(true)
                         .setMaxLength(128)
                 )
                 .addIntegerOption((option) =>
                     option
                         .setName('type')
-                        .setDescription('アクティビティタイプ')
+                        .setDescription('Activity type')
                         .setRequired(false)
                         .addChoices(...activityTypeChoices)
                 )
         )
-        .addSubcommand((subcommand) =>
+
+    if (hasStorage) {
+        builder.addSubcommand((subcommand) =>
             subcommand
                 .setName('history')
-                .setDescription('Botのステータス変更履歴を表示します')
+                .setDescription('Show bot status change history')
                 .addIntegerOption((option) =>
                     option
                         .setName('limit')
-                        .setDescription('表示する履歴の件数')
+                        .setDescription('Number of history entries to display')
                         .setRequired(false)
                         .setMinValue(1)
                         .setMaxValue(25)
                 )
-        ) as SlashCommandBuilder,
+        )
+    }
 
-    async execute(interaction: ChatInputCommandInteraction) {
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral })
+    return {
+        data: builder as SlashCommandBuilder,
 
-        const lacksPermission = (await checker?.(interaction, 'admin')) ?? false
-        if (lacksPermission) return
+        async execute(interaction: ChatInputCommandInteraction) {
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral })
 
-        const subcommand = interaction.options.getSubcommand()
+            const lacksPermission = (await guard?.(interaction)) ?? false
+            if (lacksPermission) return
 
-        if (subcommand === 'set') {
-            await handleSetStatus(interaction)
-        } else if (subcommand === 'history') {
-            await handleStatusHistory(interaction)
-        }
-    },
+            const subcommand = interaction.options.getSubcommand()
 
-    showInHelp: checker ? async (interaction) => !(await checker(interaction, 'admin')) : undefined,
-})
+            if (subcommand === 'set') {
+                await handleSetStatus(interaction)
+            } else if (subcommand === 'history') {
+                await handleStatusHistory(interaction)
+            }
+        },
+
+        showInHelp: guard ? async (interaction) => !(await guard(interaction)) : undefined,
+    }
+}
 
 async function handleSetStatus(interaction: ChatInputCommandInteraction) {
     const storage = getBotStatusStorage()
@@ -90,12 +97,10 @@ async function handleSetStatus(interaction: ChatInputCommandInteraction) {
         await storage?.save({ message, activityType, setBy: interaction.user.id })
 
         const activityTypeName = activityTypeNames[activityType] ?? 'Playing'
-        await interaction.editReply(
-            `✅ Botのステータスを更新しました:\n**${activityTypeName}**: ${message}`
-        )
+        await interaction.editReply(`✅ Bot status updated:\n**${activityTypeName}**: ${message}`)
     } catch (error) {
         log.error('Failed to set status', error)
-        await interaction.editReply('ステータスの更新に失敗しました。もう一度お試しください。')
+        await interaction.editReply('Failed to update status. Please try again.')
     }
 }
 
@@ -107,26 +112,26 @@ async function handleStatusHistory(interaction: ChatInputCommandInteraction) {
         const history = await storage?.getHistory(limit)
 
         if (!history || history.length === 0) {
-            await interaction.editReply('ステータス変更履歴がありません。')
+            await interaction.editReply('No status change history found.')
             return
         }
 
         const embed = new EmbedBuilder()
-            .setTitle('📜 Botステータス変更履歴')
+            .setTitle('📜 Bot Status Change History')
             .setColor(0x5865f2)
-            .setDescription(`最新${history.length}件のステータス変更履歴を表示しています。`)
+            .setDescription(`Showing the latest ${history.length} status change(s).`)
             .setTimestamp()
 
         for (const status of history) {
             const typeName = activityTypeNames[status.activityType] ?? 'Unknown'
             const setBy = status.setBy ? `<@${status.setBy}>` : 'API'
             const date = new Date(status.createdAt).toLocaleString('ja-JP', {
-                timeZone: 'Asia/Tokyo',
+                timeZone: 'UTC',
             })
 
             embed.addFields({
                 name: `${typeName}: ${status.message}`,
-                value: `設定者: ${setBy}\n日時: ${date}`,
+                value: `Set by: ${setBy}\nDate: ${date}`,
                 inline: false,
             })
         }
@@ -134,6 +139,6 @@ async function handleStatusHistory(interaction: ChatInputCommandInteraction) {
         await interaction.editReply({ embeds: [embed] })
     } catch (error) {
         log.error('Failed to get status history', error)
-        await interaction.editReply('ステータス履歴の取得に失敗しました。もう一度お試しください。')
+        await interaction.editReply('Failed to retrieve status history. Please try again.')
     }
 }

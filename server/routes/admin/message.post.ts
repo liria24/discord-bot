@@ -1,4 +1,4 @@
-import { requireReadyDiscordClient } from '@liria/nitro-discord'
+import { DiscordBotUnavailableError, requireReadyDiscordClient } from '@liria/nitro-discord'
 import type { MessageCreateOptions } from '@liria/nitro-discord/discord.js'
 import { getReasonPhrase, StatusCodes } from 'http-status-codes'
 import { HTTPError } from 'nitro/h3'
@@ -62,7 +62,18 @@ export default adminHandler(async ({ apiKeyRecord }) => {
     const { content, embeds } = await validateBody(adminMessageBodySchema, { sanitize: true })
     const trimmedContent = content?.trim()
 
-    const client = requireReadyDiscordClient()
+    let client
+    try {
+        client = requireReadyDiscordClient()
+    } catch (error) {
+        if (error instanceof DiscordBotUnavailableError)
+            throw new HTTPError({
+                status: StatusCodes.SERVICE_UNAVAILABLE,
+                statusText: getReasonPhrase(StatusCodes.SERVICE_UNAVAILABLE),
+                message: error.message,
+            })
+        throw error
+    }
 
     // admin権限を持つユーザーを取得し、DM受信をオプトアウトしていないユーザーのみフィルタリング
     const allAdminUsers = await listUsersByPermission('admin')

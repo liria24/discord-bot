@@ -6,12 +6,18 @@ import {
     SlashCommandBuilder,
 } from 'discord.js'
 
-import { getEmailMonitor } from '../emailMonitor.js'
-import type { DiscordCommand, PermissionChecker } from '../types.js'
+import { getEmailMonitor, getEmailMonitorStorage } from '../emailMonitor.js'
+import type { CommandGuard, DiscordCommand } from '../types.js'
 
 const log = consola.withTag('email')
 
-export const createEmailCommand = (checker?: PermissionChecker): DiscordCommand => ({
+/**
+ * Creates the `/email` slash command for managing monitored email accounts.
+ *
+ * Currently supports IMAP via the `add` subcommand. For future multi-protocol
+ * support, consider splitting into `add-imap`, `add-pop3`, etc. subcommands.
+ */
+export const createEmailCommand = (guard?: CommandGuard): DiscordCommand => ({
     data: new SlashCommandBuilder()
         .setName('email')
         .setDescription('Manage email monitoring accounts (admin only)')
@@ -35,7 +41,9 @@ export const createEmailCommand = (checker?: PermissionChecker): DiscordCommand 
                 .addStringOption((option) =>
                     option
                         .setName('host')
-                        .setDescription('IMAP host (e.g. imap.example.com or imap.example.com:993)')
+                        .setDescription(
+                            'Mail server host (e.g. imap.example.com or imap.example.com:993)'
+                        )
                         .setRequired(true)
                 )
                 .addStringOption((option) =>
@@ -73,37 +81,29 @@ export const createEmailCommand = (checker?: PermissionChecker): DiscordCommand 
 
         await interaction.deferReply({ flags: MessageFlags.Ephemeral })
 
-        // Only run the permission check if checker is provided
-        // If undefined, skip the check (everyone is allowed)
-        const lacksPermission = (await checker?.(interaction, 'admin')) ?? false
+        const lacksPermission = (await guard?.(interaction)) ?? false
         if (lacksPermission) return
 
-        if (subcommand === 'list') {
-            await handleListEmails(interaction)
-        } else if (subcommand === 'add') {
-            await handleAddEmail(interaction)
-        } else if (subcommand === 'toggle') {
-            await handleToggleEmail(interaction)
-        } else if (subcommand === 'delete') {
-            await handleDeleteEmail(interaction)
-        } else if (subcommand === 'check') {
-            await handleCheckNow(interaction)
-        }
+        if (subcommand === 'list') await handleListEmails(interaction)
+        else if (subcommand === 'add') await handleAddEmail(interaction)
+        else if (subcommand === 'toggle') await handleToggleEmail(interaction)
+        else if (subcommand === 'delete') await handleDeleteEmail(interaction)
+        else if (subcommand === 'check') await handleCheckNow(interaction)
     },
-    showInHelp: checker ? async (interaction) => !(await checker(interaction, 'admin')) : undefined,
+    showInHelp: guard ? async (interaction) => !(await guard(interaction)) : undefined,
 })
 
 const handleListEmails = async (interaction: ChatInputCommandInteraction) => {
-    const monitor = getEmailMonitor()
+    const storage = getEmailMonitorStorage()
     try {
-        const accounts = await monitor?.listAccounts()
+        const accounts = await storage?.listAccounts()
 
         if (!accounts || accounts.length === 0) {
             await interaction.editReply('No email accounts have been registered.')
             return
         }
 
-        const interval = await monitor?.getCheckInterval()
+        const interval = await storage?.getCheckInterval()
 
         const embed = new EmbedBuilder()
             .setTitle('📧 Email Account List')
@@ -133,7 +133,7 @@ const handleListEmails = async (interaction: ChatInputCommandInteraction) => {
 }
 
 const handleAddEmail = async (interaction: ChatInputCommandInteraction) => {
-    const monitor = getEmailMonitor()
+    const storage = getEmailMonitorStorage()
     const name = interaction.options.getString('name', true)
     const email = interaction.options.getString('email', true)
     const hostInput = interaction.options.getString('host', true)
@@ -141,31 +141,28 @@ const handleAddEmail = async (interaction: ChatInputCommandInteraction) => {
     const userInput = interaction.options.getString('user')
 
     // Parse host and port (supports host:port format)
-    let imapHost = hostInput
-    let imapPort: number | undefined
+    let host = hostInput
+    let port = 993
 
     if (hostInput.includes(':')) {
-        const [host, port] = hostInput.split(':')
-        imapHost = host ?? hostInput
-
-        if (port !== undefined) {
-            const parsedPort = Number.parseInt(port, 10)
+        const [h, p] = hostInput.split(':')
+        host = h ?? hostInput
+        if (p !== undefined) {
+            const parsedPort = Number.parseInt(p, 10)
             if (!Number.isNaN(parsedPort) && parsedPort > 0 && parsedPort <= 65535)
-                imapPort = parsedPort
+                port = parsedPort
         }
     }
 
     // Use email address if username is not provided
-    const imapUser = userInput?.trim() || email
+    const user = userInput?.trim() || email
 
     try {
-        const account = await monitor?.addAccount({
+        const account = await storage?.addAccount({
+            protocol: 'imap',
             name,
             email,
-            imapHost,
-            imapPort,
-            imapUser,
-            imapPassword: password,
+            credentials: { host, port, user, password },
         })
 
         if (!account) throw new Error('Failed to create email account')
@@ -180,11 +177,11 @@ const handleAddEmail = async (interaction: ChatInputCommandInteraction) => {
 }
 
 const handleToggleEmail = async (interaction: ChatInputCommandInteraction) => {
-    const monitor = getEmailMonitor()
+    const storage = getEmailMonitorStorage()
     const email = interaction.options.getString('email', true)
 
     try {
-        const account = await monitor?.getAccountByEmail(email)
+        const account = await storage?.getAccountByEmail(email)
 
         if (!account) {
             await interaction.editReply('No account found for the specified email address.')
@@ -192,7 +189,7 @@ const handleToggleEmail = async (interaction: ChatInputCommandInteraction) => {
         }
 
         const newStatus = !account.enabled
-        await monitor?.toggleAccount(account.id, newStatus)
+        await storage?.toggleAccount(account.id, newStatus)
 
         await interaction.editReply(
             `✅ Email account "${account.name}" has been ${newStatus ? 'enabled' : 'disabled'}.`
@@ -204,18 +201,18 @@ const handleToggleEmail = async (interaction: ChatInputCommandInteraction) => {
 }
 
 const handleDeleteEmail = async (interaction: ChatInputCommandInteraction) => {
-    const monitor = getEmailMonitor()
+    const storage = getEmailMonitorStorage()
     const email = interaction.options.getString('email', true)
 
     try {
-        const account = await monitor?.getAccountByEmail(email)
+        const account = await storage?.getAccountByEmail(email)
 
         if (!account) {
             await interaction.editReply('No account found for the specified email address.')
             return
         }
 
-        await monitor?.removeAccount(account.id)
+        await storage?.removeAccount(account.id)
 
         await interaction.editReply(`✅ Email account "${account.name}" has been deleted.`)
     } catch (error) {
@@ -229,7 +226,7 @@ const handleCheckNow = async (interaction: ChatInputCommandInteraction) => {
     await interaction.editReply('📧 Starting email check...')
 
     try {
-        const result = await monitor?.checkNow()
+        const result = await monitor?.checkNow?.()
 
         if (!result) {
             await interaction.editReply('❌ Email monitoring is not enabled.')

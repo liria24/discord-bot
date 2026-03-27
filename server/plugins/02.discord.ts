@@ -1,5 +1,4 @@
 import { defineDiscordPlugin, getDiscordBotController } from '@liria/nitro-discord'
-import { useRuntimeConfig } from 'nitro/runtime-config'
 
 export default defineDiscordPlugin(
     {
@@ -9,12 +8,12 @@ export default defineDiscordPlugin(
         },
     },
     {
-        name: 'Liria Bot',
+        botName: 'Liria Bot',
         help: {
             footer: 'Contact an administrator if you have any questions.',
         },
         emailMonitor: {
-            enabled: useRuntimeConfig().emailMonitor.enabled,
+            enabled: true,
             onNewEmail: async ({ embed }) => {
                 const controller = getDiscordBotController()
 
@@ -49,8 +48,9 @@ export default defineDiscordPlugin(
             },
         },
         botStatus: {
-            routeWrapper: (inner) => adminHandler(({ event }) => inner(event)),
+            enabled: true,
+            routeAuth: (inner) => adminHandler(({ event }) => inner(event)),
         },
-        permissionChecker: showPermissionPromptIfNeeded,
+        guard: (interaction) => showPermissionPromptIfNeeded(interaction, 'admin'),
     }
 )

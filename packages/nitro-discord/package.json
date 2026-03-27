@@ -17,11 +17,11 @@
         }
     },
     "scripts": {
-        "prebuild": "bun run --filter '@liria/email-monitor' build",
+        "prebuild": "bun run --filter '@liria/email-poller' build",
         "build": "tsdown"
     },
     "dependencies": {
-        "@liria/email-monitor": "workspace:*",
+        "@liria/email-poller": "workspace:*",
         "consola": "3.4.2",
         "discord.js": "14.25.1",
         "http-status-codes": "^2.3.0"
